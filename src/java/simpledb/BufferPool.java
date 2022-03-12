@@ -2,7 +2,10 @@ package simpledb;
 
 import java.io.*;
 
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * BufferPool manages the reading and writing of pages into memory from
@@ -26,13 +29,72 @@ public class BufferPool {
     constructor instead. */
     public static final int DEFAULT_PAGES = 50;
 
+
+    private final ConcurrentHashMap<Key, PageEntity> bufferPool;
+    private final int maxSize;
+
+    /**
+     * A help class used to represent a search key for a page.
+     */
+    public static class Key implements Serializable {
+
+        private static final long serialVersionUID = 1L;
+
+        private final TransactionId tid;
+        private final PageId pid;
+
+        public Key(TransactionId tid, PageId pid) {
+            this.tid = tid;
+            this.pid = pid;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Key key = (Key) o;
+            return Objects.equals(tid, key.tid) && Objects.equals(pid, key.pid);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(tid, pid);
+        }
+    }
+
+    /**
+     * A help class used to represent a BufferPool page with lock.
+     */
+    public static class PageEntity implements Serializable {
+
+        private static final long serialVersionUID = 1L;
+
+        private final Page page;
+        private final Lock lock;
+
+        public PageEntity(Page page, Lock lock) {
+            this.page = page;
+            this.lock = lock;
+        }
+
+        public Page getPage() {
+            return page;
+        }
+
+        public Lock getLock() {
+            return lock;
+        }
+    }
+
+
     /**
      * Creates a BufferPool that caches up to numPages pages.
      *
      * @param numPages maximum number of pages in this buffer pool.
      */
     public BufferPool(int numPages) {
-        // some code goes here
+        maxSize = numPages;
+        bufferPool = new ConcurrentHashMap<>(numPages);
     }
     
     public static int getPageSize() {
@@ -66,8 +128,27 @@ public class BufferPool {
      */
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
         throws TransactionAbortedException, DbException {
-        // some code goes here
-        return null;
+        // TODO: maybe we should use a lock and the given permission here
+
+        // make sure the parameters are valid
+        assert tid != null && pid != null && perm != null;
+
+        if (bufferPool.size() >= maxSize) {
+            // TODO: we should evict a page here
+            throw new DbException("BufferPool is full");
+        }
+
+        Key key = new Key(tid, pid);
+        PageEntity pageEntity = bufferPool.get(key);
+        if (pageEntity == null) {
+            // we need to read the page from disk
+            Page page = Database.getCatalog().getDatabaseFile(pid.getTableId()).readPage(pid);
+            bufferPool.put(key, new PageEntity(page, null /* may be a lock */));
+            return page;
+        } else {
+            // the page is already in the buffer pool
+            return pageEntity.getPage();
+        }
     }
 
     /**
