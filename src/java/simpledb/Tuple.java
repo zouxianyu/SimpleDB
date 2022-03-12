@@ -89,8 +89,8 @@ public class Tuple implements Serializable {
      */
     public String toString() {
         StringBuilder builder = new StringBuilder();
-        for (int i =0;i<td.numFields();i++){
-            if(i!=0){
+        for (int i = 0; i < td.numFields(); i++) {
+            if (i != 0) {
                 builder.append("\t");
             }
             builder.append(fields.get(i).toString());

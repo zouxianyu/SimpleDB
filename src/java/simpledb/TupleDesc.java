@@ -217,8 +217,8 @@ public class TupleDesc implements Serializable {
      */
     public String toString() {
         StringBuilder builder = new StringBuilder();
-        for (int i =0;i<items.size();i++){
-            if(i!=0){
+        for (int i = 0; i < items.size(); i++) {
+            if (i != 0) {
                 builder.append(", ");
             }
             builder.append(items.get(i).fieldType);
@@ -227,6 +227,5 @@ public class TupleDesc implements Serializable {
             builder.append(")");
         }
         return builder.toString();
-
     }
 }
