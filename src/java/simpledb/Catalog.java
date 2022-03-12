@@ -1,9 +1,6 @@
 package simpledb;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -19,11 +16,93 @@ import java.util.concurrent.ConcurrentHashMap;
 public class Catalog {
 
     /**
+     * A help class used to represent a logical table.
+     */
+    public static class Table implements Serializable {
+
+        private static final long serialVersionUID = 1L;
+
+        private DbFile dbFile;
+        private String name;
+        private String pkeyField;
+
+        public Table(DbFile dbFile, String name, String pkeyField) {
+            this.dbFile = dbFile;
+            this.name = name;
+            this.pkeyField = pkeyField;
+        }
+
+        public DbFile getDbFile() {
+            return dbFile;
+        }
+
+        public void setDbFile(DbFile dbFile) {
+            this.dbFile = dbFile;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getPkeyField() {
+            return pkeyField;
+        }
+
+        public void setPkeyField(String pkeyField) {
+            this.pkeyField = pkeyField;
+        }
+    }
+
+    /**
+     * using ConcurrentHashMap(name -> table) to speed up the lookup process
+     */
+    private final ConcurrentHashMap<String, Table> nameMap = new ConcurrentHashMap<>();
+
+    /**
+     * using ConcurrentHashMap(id -> table) to speed up the lookup process
+     */
+    private final ConcurrentHashMap<Integer, Table> idMap = new ConcurrentHashMap<>();
+
+    /**
+     * Return the table with a given table id.
+     * @param tableId the id of the table.
+     * @return the table with a given table id.
+     * @throws NoSuchElementException if no such table exists
+     */
+    private Table getTable(int tableId) throws NoSuchElementException  {
+        Table table = idMap.get(tableId);
+        if (table == null) {
+            throw new NoSuchElementException();
+        }
+        return table;
+    }
+
+    /**
+     * Return the table with a given table name.
+     * @param tableName the name of the table.
+     * @return the table with a given table name.
+     * @throws NoSuchElementException if no such table exists
+     */
+    private Table getTable(String tableName) throws NoSuchElementException  {
+        if(tableName == null) {
+            throw new NoSuchElementException();
+        }
+        Table table = nameMap.get(tableName);
+        if (table == null) {
+            throw new NoSuchElementException();
+        }
+        return table;
+    }
+
+    /**
      * Constructor.
      * Creates a new, empty catalog.
      */
     public Catalog() {
-        // some code goes here
     }
 
     /**
@@ -36,7 +115,9 @@ public class Catalog {
      * @param pkeyField the name of the primary key field
      */
     public void addTable(DbFile file, String name, String pkeyField) {
-        // some code goes here
+        Table table = new Table(file, name, pkeyField);
+        nameMap.put(name, table);
+        idMap.put(file.getId(), table);
     }
 
     public void addTable(DbFile file, String name) {
@@ -59,8 +140,7 @@ public class Catalog {
      * @throws NoSuchElementException if the table doesn't exist
      */
     public int getTableId(String name) throws NoSuchElementException {
-        // some code goes here
-        return 0;
+        return getTable(name).getDbFile().getId();
     }
 
     /**
@@ -70,8 +150,7 @@ public class Catalog {
      * @throws NoSuchElementException if the table doesn't exist
      */
     public TupleDesc getTupleDesc(int tableid) throws NoSuchElementException {
-        // some code goes here
-        return null;
+        return getTable(tableid).getDbFile().getTupleDesc();
     }
 
     /**
@@ -81,28 +160,25 @@ public class Catalog {
      *     function passed to addTable
      */
     public DbFile getDatabaseFile(int tableid) throws NoSuchElementException {
-        // some code goes here
-        return null;
+        return getTable(tableid).getDbFile();
     }
 
     public String getPrimaryKey(int tableid) {
-        // some code goes here
-        return null;
+        return getTable(tableid).getPkeyField();
     }
 
     public Iterator<Integer> tableIdIterator() {
-        // some code goes here
-        return null;
+        return idMap.keySet().iterator();
     }
 
     public String getTableName(int id) {
-        // some code goes here
-        return null;
+        return getTable(id).getName();
     }
     
     /** Delete all tables from the catalog */
     public void clear() {
-        // some code goes here
+        nameMap.clear();
+        idMap.clear();
     }
     
     /**
