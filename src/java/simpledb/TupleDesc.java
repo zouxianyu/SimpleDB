@@ -18,12 +18,12 @@ public class TupleDesc implements Serializable {
         /**
          * The type of the field
          * */
-        public final Type fieldType;
+        public Type fieldType;
 
         /**
          * The name of the field
          * */
-        public final String fieldName;
+        public String fieldName;
 
         public TDItem(Type t, String n) {
             this.fieldName = n;
@@ -89,6 +89,14 @@ public class TupleDesc implements Serializable {
      */
     public TupleDesc(Type[] typeAr) {
         this(typeAr, new String[typeAr.length]);
+    }
+
+    /**
+     * Copy constructor.
+     * @param td the tuple descriptor to copy
+     */
+    public TupleDesc(TupleDesc td) {
+        Collections.copy(items, td.items);
     }
 
     /**
