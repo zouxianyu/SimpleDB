@@ -70,8 +70,12 @@ public class HeapFile implements DbFile {
 
     // see DbFile.java for javadocs
     public Page readPage(PageId pid) {
+        int pageSize = BufferPool.getPageSize();
+        int pos = pid.getPageNumber() * pageSize;
+        if(pos >= file.length()){
+            throw new IllegalArgumentException("Page number is out of bound");
+        }
         try {
-            int pageSize = BufferPool.getPageSize();
             raf.seek((long) pid.getPageNumber() * pageSize);
             byte[] data = new byte[pageSize];
             raf.read(data, 0, pageSize);
@@ -116,6 +120,15 @@ public class HeapFile implements DbFile {
         return new AbstractDbFileIterator() {
             private int pageNumber = 0;
             private Iterator<Tuple> tupleIterator = null;
+
+            {
+                try {
+                    open();
+                }catch (DbException | TransactionAbortedException e) {
+                    e.printStackTrace();
+                }
+            }
+
             @Override
             public void open() throws DbException, TransactionAbortedException {
                 //get the first page using BufferPool
@@ -144,12 +157,13 @@ public class HeapFile implements DbFile {
                 }
                 // if there is no more tuples, get the next page
                 if(!tupleIterator.hasNext()) {
-                    // TODO: maybe we should use another permission here
-                    HeapPage curPage = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(getId(), ++pageNumber), Permissions.READ_ONLY);
+                    pageNumber++;
                     // if there is no more pages, return null
-                    if(curPage == null) {
+                    if(pageNumber >= numPages()){
                         return null;
                     }
+                    // TODO: maybe we should use another permission here
+                    HeapPage curPage = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(getId(), pageNumber), Permissions.READ_ONLY);
                     tupleIterator = curPage.iterator();
                 }
                 return tupleIterator.next();
