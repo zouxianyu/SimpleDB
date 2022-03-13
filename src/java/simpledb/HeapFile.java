@@ -15,6 +15,10 @@ import java.util.*;
  */
 public class HeapFile implements DbFile {
 
+    private final File file;
+    private final TupleDesc td;
+    private RandomAccessFile raf;
+
     /**
      * Constructs a heap file backed by the specified file.
      * 
@@ -23,7 +27,14 @@ public class HeapFile implements DbFile {
      *            file.
      */
     public HeapFile(File f, TupleDesc td) {
-        // some code goes here
+        this.file = f;
+        this.td = td;
+        try {
+            // TODO: determine whether the mode should be "r" or "rw"
+            raf = new RandomAccessFile(file, "rw");
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -32,8 +43,7 @@ public class HeapFile implements DbFile {
      * @return the File backing this HeapFile on disk.
      */
     public File getFile() {
-        // some code goes here
-        return null;
+        return file;
     }
 
     /**
@@ -46,8 +56,7 @@ public class HeapFile implements DbFile {
      * @return an ID uniquely identifying this HeapFile.
      */
     public int getId() {
-        // some code goes here
-        throw new UnsupportedOperationException("implement this");
+        return file.getAbsoluteFile().hashCode();
     }
 
     /**
@@ -56,13 +65,20 @@ public class HeapFile implements DbFile {
      * @return TupleDesc of this DbFile.
      */
     public TupleDesc getTupleDesc() {
-        // some code goes here
-        throw new UnsupportedOperationException("implement this");
+        return td;
     }
 
     // see DbFile.java for javadocs
     public Page readPage(PageId pid) {
-        // some code goes here
+        try {
+            int pageSize = BufferPool.getPageSize();
+            raf.seek((long) pid.getPageNumber() * pageSize);
+            byte[] data = new byte[pageSize];
+            raf.read(data, 0, pageSize);
+            return new HeapPage(new HeapPageId(pid.getTableId(),pid.getPageNumber()), data);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         return null;
     }
 
@@ -76,8 +92,7 @@ public class HeapFile implements DbFile {
      * Returns the number of pages in this HeapFile.
      */
     public int numPages() {
-        // some code goes here
-        return 0;
+        return (int) ((file.length() - 1) / BufferPool.getPageSize() + 1);
     }
 
     // see DbFile.java for javadocs
@@ -98,8 +113,48 @@ public class HeapFile implements DbFile {
 
     // see DbFile.java for javadocs
     public DbFileIterator iterator(TransactionId tid) {
-        // some code goes here
-        return null;
+        return new AbstractDbFileIterator() {
+            private int pageNumber = 0;
+            private Iterator<Tuple> tupleIterator = null;
+            @Override
+            public void open() throws DbException, TransactionAbortedException {
+                //get the first page using BufferPool
+                HeapPage curPage = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(getId(), pageNumber), Permissions.READ_ONLY);
+                tupleIterator = curPage.iterator();
+            }
+
+            @Override
+            public void close(){
+                super.close();
+                pageNumber = 0;
+                tupleIterator = null;
+            }
+
+            @Override
+            public void rewind() throws DbException, TransactionAbortedException {
+                close();
+                open();
+            }
+
+            @Override
+            protected Tuple readNext() throws DbException, TransactionAbortedException {
+                // not open
+                if(tupleIterator == null){
+                    return null;
+                }
+                // if there is no more tuples, get the next page
+                if(!tupleIterator.hasNext()) {
+                    // TODO: maybe we should use another permission here
+                    HeapPage curPage = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(getId(), ++pageNumber), Permissions.READ_ONLY);
+                    // if there is no more pages, return null
+                    if(curPage == null) {
+                        return null;
+                    }
+                    tupleIterator = curPage.iterator();
+                }
+                return tupleIterator.next();
+            }
+        };
     }
 
 }
