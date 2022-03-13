@@ -5,7 +5,6 @@ import java.io.*;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * BufferPool manages the reading and writing of pages into memory from
@@ -30,7 +29,7 @@ public class BufferPool {
     public static final int DEFAULT_PAGES = 50;
 
 
-    private final ConcurrentHashMap<Key, PageEntity> bufferPool;
+    private final ConcurrentHashMap<PageId, BufferedPageInfo> bufferPool;
     private final int maxSize;
 
     /**
@@ -65,14 +64,14 @@ public class BufferPool {
     /**
      * A help class used to represent a BufferPool page with lock.
      */
-    public static class PageEntity implements Serializable {
+    public static class BufferedPageInfo implements Serializable {
 
         private static final long serialVersionUID = 1L;
 
         private final Page page;
         private final Lock lock;
 
-        public PageEntity(Page page, Lock lock) {
+        public BufferedPageInfo(Page page, Lock lock) {
             this.page = page;
             this.lock = lock;
         }
@@ -138,16 +137,15 @@ public class BufferPool {
             throw new DbException("BufferPool is full");
         }
 
-        Key key = new Key(tid, pid);
-        PageEntity pageEntity = bufferPool.get(key);
-        if (pageEntity == null) {
+        BufferedPageInfo bufferedPageInfo = bufferPool.get(pid);
+        if (bufferedPageInfo == null) {
             // we need to read the page from disk
             Page page = Database.getCatalog().getDatabaseFile(pid.getTableId()).readPage(pid);
-            bufferPool.put(key, new PageEntity(page, null /* may be a lock */));
+            bufferPool.put(pid, new BufferedPageInfo(page, null /* may be a lock */));
             return page;
         } else {
             // the page is already in the buffer pool
-            return pageEntity.getPage();
+            return bufferedPageInfo.getPage();
         }
     }
 
