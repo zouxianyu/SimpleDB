@@ -96,7 +96,9 @@ public class TupleDesc implements Serializable {
      * @param td the tuple descriptor to copy
      */
     public TupleDesc(TupleDesc td) {
-        Collections.copy(items, td.items);
+        for (TDItem item : td.items) {
+            items.add(new TDItem(item.fieldType, item.fieldName));
+        }
     }
 
     /**
