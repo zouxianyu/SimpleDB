@@ -118,6 +118,8 @@ public class Join extends Operator {
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
 
+        // if we can use "yield" syntax, the code is much simpler
+
         // if the iteration is over, return null
         if(end) {
             return null;
@@ -144,7 +146,13 @@ public class Join extends Operator {
             return null;
         }
 
-        return merge(getTupleDesc(), temp[0], temp[1]);
+        // if the join predicate is true, return the merged tuple
+        // otherwise, call fetchNext() again
+        if(joinPredicate.filter(temp[0], temp[1])){
+            return merge(getTupleDesc(), temp[0], temp[1]);
+        }else{
+            return fetchNext();
+        }
     }
 
     @Override
