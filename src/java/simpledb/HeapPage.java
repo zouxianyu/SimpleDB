@@ -278,8 +278,10 @@ public class HeapPage implements Page {
      */
     public int getNumEmptySlots() {
         int count = 0;
+        int j = 0;
+        final int numTuples = getNumTuples();
         for(byte b : header) {
-            for(int i = 0; i < 8; i++) {
+            for(int i = 0; i < 8 && j < numTuples; i++, j++) {
                 if(((b >> i) & 1) == 0) {
                     count++;
                 }
@@ -292,6 +294,9 @@ public class HeapPage implements Page {
      * Returns true if associated slot on this page is filled.
      */
     public boolean isSlotUsed(int i) {
+        if (i < 0 || i >= getNumTuples()) {
+            throw new IllegalArgumentException("Invalid slot number");
+        }
         int byteId = i / 8;
         int bitId = i % 8;
         return ((header[byteId] >> bitId) & 1) == 1;
