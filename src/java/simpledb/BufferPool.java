@@ -2,8 +2,7 @@ package simpledb;
 
 import java.io.*;
 
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 
@@ -31,6 +30,7 @@ public class BufferPool {
 
 
     private final ConcurrentHashMap<PageId, BufferedPageInfo> bufferPool;
+    private final List<PageId> LRUList;
     private final int maxSize;
 
     /**
@@ -95,6 +95,7 @@ public class BufferPool {
     public BufferPool(int numPages) {
         maxSize = numPages;
         bufferPool = new ConcurrentHashMap<>(numPages);
+        LRUList = new LinkedList<>();
     }
     
     public static int getPageSize() {
@@ -133,21 +134,27 @@ public class BufferPool {
         // make sure the parameters are valid
         assert tid != null && pid != null && perm != null;
 
-        if (bufferPool.size() >= maxSize) {
-            // TODO: we should evict a page here
-            throw new DbException("BufferPool is full");
+        // if our buffer pool is full, we need to evict a page
+        if (bufferPool.size() + 1 >= maxSize) {
+            evictPage();
         }
 
         BufferedPageInfo bufferedPageInfo = bufferPool.get(pid);
+        Page page = null;
         if (bufferedPageInfo == null) {
             // we need to read the page from disk
-            Page page = Database.getCatalog().getDatabaseFile(pid.getTableId()).readPage(pid);
+            page = Database.getCatalog().getDatabaseFile(pid.getTableId()).readPage(pid);
             bufferPool.put(pid, new BufferedPageInfo(page, null /* may be a lock */));
-            return page;
+            // add the new page to the LRU list head
+            LRUList.add(0, pid);
         } else {
             // the page is already in the buffer pool
-            return bufferedPageInfo.getPage();
+            page = bufferedPageInfo.getPage();
+            // adjust the LRU list
+            LRUList.remove(pid);
+            LRUList.add(0, pid);
         }
+        return page;
     }
 
     /**
@@ -249,9 +256,11 @@ public class BufferPool {
      *     break simpledb if running in NO STEAL mode.
      */
     public synchronized void flushAllPages() throws IOException {
-        // some code goes here
-        // not necessary for lab1
-
+        // duplicate the PageId set because we will be modifying it
+        Set<PageId> ids = new HashSet<PageId>(bufferPool.keySet());
+        for (PageId id : ids) {
+            flushPage(id);
+        }
     }
 
     /** Remove the specific page id from the buffer pool.
@@ -263,8 +272,10 @@ public class BufferPool {
         are removed from the cache so they can be reused safely
     */
     public synchronized void discardPage(PageId pid) {
-        // some code goes here
-        // not necessary for lab1
+        assert bufferPool.containsKey(pid);
+        BufferedPageInfo bufferedPageInfo = bufferPool.get(pid);
+        Page page = bufferedPageInfo.getPage();
+        bufferPool.remove(pid);
     }
 
     /**
@@ -272,8 +283,19 @@ public class BufferPool {
      * @param pid an ID indicating the page to flush
      */
     private synchronized  void flushPage(PageId pid) throws IOException {
-        // some code goes here
-        // not necessary for lab1
+        assert bufferPool.containsKey(pid);
+        BufferedPageInfo bufferedPageInfo = bufferPool.get(pid);
+        Page page = bufferedPageInfo.getPage();
+        // remove the cached page from the buffer pool
+        bufferPool.remove(pid);
+        // if the page is clean, no need to flush
+        if (page.isDirty() == null) {
+            return;
+        }
+        // otherwise, write the page to disk, and mark it clean
+        DbFile dbFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
+        dbFile.writePage(page);
+        page.markDirty(false, null);
     }
 
     /** Write all pages of the specified transaction to disk.
@@ -288,8 +310,13 @@ public class BufferPool {
      * Flushes the page to disk to ensure dirty pages are updated on disk.
      */
     private synchronized  void evictPage() throws DbException {
-        // some code goes here
-        // not necessary for lab1
+        try {
+            PageId theLastPage = LRUList.get(LRUList.size() - 1);
+            LRUList.remove(theLastPage);
+            flushPage(theLastPage);
+        } catch (IOException e) {
+            throw new DbException("IOException in evictPage()");
+        }
     }
 
 }
