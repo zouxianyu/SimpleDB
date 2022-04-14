@@ -105,7 +105,7 @@ public class HeapFile implements DbFile {
         return (int) ((file.length() - 1) / BufferPool.getPageSize() + 1);
     }
 
-    private void createNewPage(HeapPageId pid) throws IOException {
+    private void createNewPage() throws IOException {
         raf.seek(file.length());
         byte[] data = new byte[BufferPool.getPageSize()];
         raf.write(data);
@@ -120,7 +120,7 @@ public class HeapFile implements DbFile {
         HeapPage page = (HeapPage) Database.getBufferPool().getPage(tid, pid, Permissions.READ_WRITE);
         if (page.getNumEmptySlots() == 0) {
             pid = new HeapPageId(getId(), numPages());
-            createNewPage(pid);
+            createNewPage();
             page = (HeapPage) Database.getBufferPool().getPage(tid, pid, Permissions.READ_WRITE);
         }
         page.insertTuple(t);
