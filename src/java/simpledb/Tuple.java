@@ -115,4 +115,16 @@ public class Tuple implements Serializable {
         assert td != null && td.numFields() == this.td.numFields();
         this.td = td;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        Tuple tuple = (Tuple) o;
+
+        if (!td.equals(tuple.td)) return false;
+        return fields.equals(tuple.fields);
+    }
+
 }
