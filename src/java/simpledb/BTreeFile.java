@@ -263,14 +263,52 @@ public class BTreeFile implements DbFile {
 		// some code goes here
         //
         // Split the leaf page by adding a new page on the right of the existing
-		// page and moving half of the tuples to the new page.  Copy the middle key up
-		// into the parent page, and recursively split the parent as needed to accommodate
-		// the new entry.  getParentWithEmtpySlots() will be useful here.  Don't forget to update
-		// the sibling pointers of all the affected leaf pages.  Return the page into which a
-		// tuple with the given key field should be inserted.
-        return null;
+        // page and moving half of the tuples to the new page.  Copy the middle key up
+        // into the parent page, and recursively split the parent as needed to accommodate
+        // the new entry.  getParentWithEmtpySlots() will be useful here.  Don't forget to update
+        // the sibling pointers of all the affected leaf pages.  Return the page into which a
+        // tuple with the given key field should be inserted.
 
-	}
+        // allocate a new page and update the sibling pointers
+        BTreeLeafPage newPage = (BTreeLeafPage) getEmptyPage(tid, dirtypages, BTreePageId.LEAF);
+        BTreePageId originalRightPageId = page.getRightSiblingId();
+        page.setRightSiblingId(newPage.getId());
+        newPage.setLeftSiblingId(page.getId());
+        newPage.setRightSiblingId(originalRightPageId);
+        if (originalRightPageId != null) {
+            BTreeLeafPage rightPage = (BTreeLeafPage) getPage(tid, dirtypages, originalRightPageId, Permissions.READ_WRITE);
+            rightPage.setLeftSiblingId(newPage.getId());
+        }
+
+        // move half of the tuples to the new page
+        int numTuples = page.getNumTuples();
+        int left = numTuples / 2;
+        int right = numTuples - left; // right is always >= left
+        // assume the number of tuples is correct
+        // so we don't check it.hasNext() in the following loop
+        Iterator<Tuple> it = page.reverseIterator();
+        // move the tuples on the right to the new page
+        for (int i = 0; i < right; i++) {
+            Tuple t = it.next();
+            page.deleteTuple(t);
+            newPage.insertTuple(t);
+        }
+
+        // determine which of the two pages to return
+        BTreeLeafPage insertPage = page;
+        // if the new tuple is on the right page, then set insertPage to the new page
+        Field midKey = newPage.iterator().next().getField(keyField());
+        if (field.compare(Op.GREATER_THAN, midKey)) {
+            insertPage = newPage;
+        }
+
+        // copy the middle key up to the parent page
+        BTreeInternalPage parent = getParentWithEmptySlots(tid, dirtypages, page.getParentId(), midKey);
+        BTreeEntry entry = new BTreeEntry(midKey, page.getId(), newPage.getId());
+        parent.insertEntry(entry);
+        newPage.setParentId(parent.getId());
+        return insertPage;
+    }
 
 	/**
 	 * Split an internal page to make room for new entries and recursively split its parent page
@@ -300,14 +338,58 @@ public class BTreeFile implements DbFile {
 		// some code goes here
         //
         // Split the internal page by adding a new page on the right of the existing
-		// page and moving half of the entries to the new page.  Push the middle key up
-		// into the parent page, and recursively split the parent as needed to accommodate
-		// the new entry.  getParentWithEmtpySlots() will be useful here.  Don't forget to update
-		// the parent pointers of all the children moving to the new page.  updateParentPointers()
-		// will be useful here.  Return the page into which an entry with the given key field
-		// should be inserted.
-		return null;
-	}
+        // page and moving half of the entries to the new page.  Push the middle key up
+        // into the parent page, and recursively split the parent as needed to accommodate
+        // the new entry.  getParentWithEmtpySlots() will be useful here.  Don't forget to update
+        // the parent pointers of all the children moving to the new page.  updateParentPointers()
+        // will be useful here.  Return the page into which an entry with the given key field
+        // should be inserted.
+
+        // allocate a new page and update the sibling pointers
+        BTreeInternalPage newPage = (BTreeInternalPage) getEmptyPage(tid, dirtypages, BTreePageId.INTERNAL);
+
+        // move half of the tuples to the new page
+        int numEntries = page.getNumEntries();
+        int left = numEntries / 2;
+        int right = numEntries - left; // right is always >= left
+        // assume the number of entries is correct
+        // so we don't check it.hasNext() in the following loop
+        Iterator<BTreeEntry> it = page.iterator();
+        // move the entries on the right to the new page
+        for (int i = 0; i < left; i++) {
+            it.next();
+        }
+        BTreeEntry midEntry = null;
+        for (int i = 0; i < right; i++) {
+            BTreeEntry entry = it.next();
+            page.deleteKeyAndRightChild(entry);
+            if (i == 0) {
+                midEntry = entry;
+            } else {
+                newPage.insertEntry(entry);
+            }
+        }
+
+        // determine which of the two pages to return
+        BTreeInternalPage insertPage = page;
+        // if the new entry is on the right page, then set insertPage to the new page
+        if (field.compare(Op.GREATER_THAN, midEntry.getKey())) {
+            insertPage = newPage;
+        }
+
+        // copy the middle key up to the parent page
+        BTreeInternalPage parent = getParentWithEmptySlots(tid, dirtypages, page.getParentId(), midEntry.getKey());
+        midEntry.setLeftChild(page.getId());
+        midEntry.setRightChild(newPage.getId());
+        parent.insertEntry(midEntry);
+
+        newPage.setParentId(parent.getId());
+        // update parent pointers
+        updateParentPointers(tid, dirtypages, parent);
+        updateParentPointers(tid, dirtypages, page);
+        updateParentPointers(tid, dirtypages, newPage);
+        return insertPage;
+    }
 
 	/**
 	 * Method to encapsulate the process of getting a parent page ready to accept new entries.
