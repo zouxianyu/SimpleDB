@@ -200,16 +200,16 @@ public class BTreeFile implements DbFile {
         // the slide window size is 2, we call them left and right
         BTreeEntry left = null;
         BTreeEntry right = null;
-        while (it.hasNext()) {
+        do {
             // slide the window from left to right
-            right = it.next();
+            right = it.hasNext() ? it.next() : null;
             boolean greaterThanLeft = (left == null || f == null || f.compare(Op.GREATER_THAN_OR_EQ, left.getKey()));
             boolean lessThanRight = (right == null || f == null || f.compare(Op.LESS_THAN_OR_EQ, right.getKey()));
             if (greaterThanLeft && lessThanRight) {
                 break;
             }
             left = right;
-        }
+        } while (right != null);
         // we get the next page id from the correct window
         BTreePageId nextPageId = left != null ? left.getRightChild() : right.getLeftChild();
         return findLeafPage(tid, dirtypages, nextPageId, perm, f);
