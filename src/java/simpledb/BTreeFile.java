@@ -381,7 +381,6 @@ public class BTreeFile implements DbFile {
 
         newPage.setParentId(parent.getId());
         // update parent pointers
-        updateParentPointers(tid, dirtypages, parent);
         updateParentPointers(tid, dirtypages, page);
         updateParentPointers(tid, dirtypages, newPage);
         return insertPage;
