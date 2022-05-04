@@ -135,7 +135,7 @@ public class BufferPool {
         assert tid != null && pid != null && perm != null;
 
         // if our buffer pool is full, we need to evict a page
-        if (bufferPool.size() + 1 >= maxSize) {
+        if (bufferPool.size() >= maxSize) {
             evictPage();
         }
 
