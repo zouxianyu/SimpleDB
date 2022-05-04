@@ -147,29 +147,32 @@ public class IntegerAggregator implements Aggregator {
     }
 
     // only for average case
-    private final List<Integer> listForAvg = new ArrayList<>();
+    private final List<Integer> listForAvg = new ArrayList<>(Arrays.asList(0, 0));
     private final HashMap<Field, List<Integer>> mapForAvg = new HashMap<>();
 
     private void averageHandler(Tuple tuple) {
-        if(gbfield == NO_GROUPING) {
+        if (gbfield == NO_GROUPING) {
             // no grouping case
-            IntField aggregateField = (IntField)tuple.getField(afield);
-            listForAvg.add(aggregateField.getValue());
-            noGroupingResult = listForAvg.stream().reduce(0, Integer::sum) / listForAvg.size();
-        }else{
+            IntField aggregateField = (IntField) tuple.getField(afield);
+            listForAvg.set(0, listForAvg.get(0) + aggregateField.getValue());
+            listForAvg.set(1, listForAvg.get(1) + 1);
+            noGroupingResult = listForAvg.get(0) / listForAvg.get(1);
+        } else {
             // grouping case
             Field groupField = tuple.getField(gbfield);
-            IntField aggregateField = (IntField)tuple.getField(afield);
+            IntField aggregateField = (IntField) tuple.getField(afield);
 
             if (mapForAvg.containsKey(groupField)) {
                 List<Integer> list = mapForAvg.get(groupField);
-                list.add(aggregateField.getValue());
-                map.put(groupField, list.stream().reduce(0, Integer::sum) / list.size());
-            }else{
-                List<Integer> list = new ArrayList<>();
-                list.add(aggregateField.getValue());
+                list.set(0, list.get(0) + aggregateField.getValue());
+                list.set(1, list.get(1) + 1);
+                map.put(groupField, list.get(0) / list.get(1));
+            } else {
+                List<Integer> list = new ArrayList<>(Arrays.asList(0, 0));
+                list.set(0, aggregateField.getValue());
+                list.set(1, 1);
                 mapForAvg.put(groupField, list);
-                map.put(groupField,aggregateField.getValue());
+                map.put(groupField, aggregateField.getValue());
             }
         }
     }
