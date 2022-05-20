@@ -78,6 +78,9 @@ public class SeqScan implements OpIterator {
 
     public void open() throws DbException, TransactionAbortedException {
         it = Database.getCatalog().getDatabaseFile(tableid).iterator(tid);
+        if (it == null) {
+            throw new DbException("Table " + tableid + " does not exist");
+        }
     }
 
     /**
