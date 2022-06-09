@@ -101,11 +101,11 @@ public class BufferPool {
             // very bad synchronized, but it works :)
             synchronized(waitingItem) {
                 try {
-                    long timeout = new Random().nextInt(1000) + 100;
+                    long timeout = new Random().nextInt(3000) + 1000;
                     long begin = System.currentTimeMillis();
                     waitingItem.wait(timeout);
                     long end = System.currentTimeMillis();
-                    if (end - begin >= timeout) {
+                    if (end - begin >= timeout * 0.9) {
                         throw new TransactionAbortedException();
                     }
                 } catch (InterruptedException e) {
