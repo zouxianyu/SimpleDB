@@ -428,7 +428,10 @@ public class BufferPool {
      * are removed from the cache so they can be reused safely
      */
     public synchronized void discardPage(PageId pid) {
-        assert bufferPool.containsKey(pid);
+//        assert bufferPool.containsKey(pid);
+        if (!bufferPool.containsKey(pid)) {
+            return;
+        }
         bufferPool.remove(pid);
         LRUList.remove(pid);
     }
