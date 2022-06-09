@@ -316,14 +316,14 @@ public class BufferPool {
      *
      * @param tid the ID of the transaction requesting the unlock
      */
-    public void transactionComplete(TransactionId tid) throws IOException {
+    public synchronized void transactionComplete(TransactionId tid) throws IOException {
         transactionComplete(tid ,true);
     }
 
     /**
      * Return true if the specified transaction has a lock on the specified page
      */
-    public boolean holdsLock(TransactionId tid, PageId p) {
+    public synchronized boolean holdsLock(TransactionId tid, PageId p) {
         PageManager pageManager = bufferPool.get(p);
         if (pageManager == null) {
             return true;
@@ -338,7 +338,7 @@ public class BufferPool {
      * @param tid    the ID of the transaction requesting the unlock
      * @param commit a flag indicating whether we should commit or abort
      */
-    public void transactionComplete(TransactionId tid, boolean commit)
+    public synchronized void transactionComplete(TransactionId tid, boolean commit)
             throws IOException {
         if (commit) {
             flushPages(tid);
@@ -367,7 +367,7 @@ public class BufferPool {
      * @param tableId the table to add the tuple to
      * @param t       the tuple to add
      */
-    public void insertTuple(TransactionId tid, int tableId, Tuple t)
+    public synchronized void insertTuple(TransactionId tid, int tableId, Tuple t)
             throws DbException, IOException, TransactionAbortedException {
         DbFile dbFile = Database.getCatalog().getDatabaseFile(tableId);
         List<Page> dirtyPages = dbFile.insertTuple(tid, t);
@@ -392,7 +392,7 @@ public class BufferPool {
      * @param tid the transaction deleting the tuple.
      * @param t   the tuple to delete
      */
-    public void deleteTuple(TransactionId tid, Tuple t)
+    public synchronized void deleteTuple(TransactionId tid, Tuple t)
             throws DbException, IOException, TransactionAbortedException {
         int tableId = t.getRecordId().getPageId().getTableId();
         DbFile dbFile = Database.getCatalog().getDatabaseFile(tableId);
